@@ -10,43 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LesenBuchRouteImport } from './routes/lesen.$buch'
+import { Route as LesenBuchSpracheRouteImport } from './routes/lesen.$buch.$sprache'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LesenBuchRoute = LesenBuchRouteImport.update({
-  id: '/lesen/$buch',
-  path: '/lesen/$buch',
+const LesenBuchSpracheRoute = LesenBuchSpracheRouteImport.update({
+  id: '/lesen/$buch/$sprache',
+  path: '/lesen/$buch/$sprache',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/lesen/$buch': typeof LesenBuchRoute
+  '/lesen/$buch/$sprache': typeof LesenBuchSpracheRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/lesen/$buch': typeof LesenBuchRoute
+  '/lesen/$buch/$sprache': typeof LesenBuchSpracheRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/lesen/$buch': typeof LesenBuchRoute
+  '/lesen/$buch/$sprache': typeof LesenBuchSpracheRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/lesen/$buch'
+  fullPaths: '/' | '/lesen/$buch/$sprache'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/lesen/$buch'
-  id: '__root__' | '/' | '/lesen/$buch'
+  to: '/' | '/lesen/$buch/$sprache'
+  id: '__root__' | '/' | '/lesen/$buch/$sprache'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  LesenBuchRoute: typeof LesenBuchRoute
+  LesenBuchSpracheRoute: typeof LesenBuchSpracheRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,11 +58,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lesen/$buch': {
-      id: '/lesen/$buch'
-      path: '/lesen/$buch'
-      fullPath: '/lesen/$buch'
-      preLoaderRoute: typeof LesenBuchRouteImport
+    '/lesen/$buch/$sprache': {
+      id: '/lesen/$buch/$sprache'
+      path: '/lesen/$buch/$sprache'
+      fullPath: '/lesen/$buch/$sprache'
+      preLoaderRoute: typeof LesenBuchSpracheRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -70,7 +70,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  LesenBuchRoute: LesenBuchRoute,
+  LesenBuchSpracheRoute: LesenBuchSpracheRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

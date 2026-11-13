@@ -3,15 +3,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, List, Type, X } from "lucide-react";
 import type { Book as EpubBook, Rendition, NavItem } from "epubjs";
 
-import type { Book } from "@/lib/books";
+import { gateUrl, ladeKatalog, lesestandKey } from "@/lib/books";
+import { flagFor, useI18n } from "@/lib/i18n";
 import { load, save } from "@/lib/storage";
 
 type Theme = "hell" | "sepia" | "dunkel";
 
 const THEMES: Record<Theme, { bg: string; fg: string; label: string }> = {
-  hell: { bg: "#ffffff", fg: "#1a1a1a", label: "Hell" },
-  sepia: { bg: "#f4ecd8", fg: "#3b2f1e", label: "Sepia" },
-  dunkel: { bg: "#14181f", fg: "#e6e6e6", label: "Dunkel" },
+  hell: { bg: "#ffffff", fg: "#1a1a1a", label: "reader.light" },
+  sepia: { bg: "#f4ecd8", fg: "#3b2f1e", label: "reader.sepia" },
+  dunkel: { bg: "#14181f", fg: "#e6e6e6", label: "reader.dark" },
 };
 
 const READ_FONT =
@@ -23,8 +24,24 @@ const MAX_SIZE = 160;
 /**
  * Der Leser. Nutzt die fertige Lese-Bibliothek epub.js (kein eigener Leser-Bau).
  * Läuft nur im Browser (epub.js braucht das DOM) – darum der dynamische Import.
+ * Das Buch selbst kommt vom Tor books-gate – in der App liegt kein Buch.
  */
-export function Reader({ book }: { book: Book }) {
+export function Reader({ buchId, sprache }: { buchId: string; sprache: string }) {
+  const { t } = useI18n();
+  const [titel, setTitel] = useState<string>(buchId);
+  const posKey = lesestandKey(buchId, sprache, "pos");
+  const pctKey = lesestandKey(buchId, sprache, "pct");
+
+  // Titel aus dem Katalog des Tors
+  useEffect(() => {
+    ladeKatalog()
+      .then((k) => {
+        const b = k.buecher.find((x) => x.id === buchId);
+        if (b) setTitel(b.titel);
+      })
+      .catch(() => {});
+  }, [buchId]);
+
   const viewerRef = useRef<HTMLDivElement>(null);
   const renditionRef = useRef<Rendition | null>(null);
   const bookRef = useRef<EpubBook | null>(null);
@@ -50,8 +67,8 @@ export function Reader({ book }: { book: Book }) {
     (async () => {
       try {
         const { default: ePub } = await import("epubjs");
-        // Buch als Datei holen. Später kommt es vom Tor books-gate (mit Ausweis).
-        const res = await fetch(book.file);
+        // Buch beim Tor holen. Nächste Stufe: mit Ausweis (Anmeldung), nur gekaufte Bücher.
+        const res = await fetch(gateUrl(`/buch/${encodeURIComponent(buchId)}/${encodeURIComponent(sprache)}`));
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.arrayBuffer();
         if (cancelled || !viewerRef.current) return;
@@ -71,12 +88,12 @@ export function Reader({ book }: { book: Book }) {
         // Farben als Themen anmelden
         for (const [name, t] of Object.entries(THEMES)) {
           rendition.themes.register(name, {
-            body: { background: `${t.bg} !important`, color: `${t.fg} !important` },
+            body: { background: `${th.bg} !important`, color: `${th.fg} !important` },
             // Einheitliche Schrift: die in InDesign eingebetteten Schriften sind
             // „verschleiert“ (META-INF/encryption.xml) und laden im Browser nicht –
             // ohne diese Zeile springt der Text zwischen Times und Arial.
             "p, li, span, h1, h2, h3, h4, h5, h6, td, div": {
-              color: `${t.fg} !important`,
+              color: `${th.fg} !important`,
               "font-family": `${READ_FONT} !important`,
             },
             a: { color: "#b8a600 !important" },
@@ -98,7 +115,7 @@ export function Reader({ book }: { book: Book }) {
           contents.document.addEventListener("keyup", (e) => onKey(e as KeyboardEvent));
         });
 
-        const startAt = load<string | null>(`ppsb_pos_${book.id}`, null);
+        const startAt = load<string | null>(posKey, null);
         await rendition.display(startAt ?? undefined);
 
         await epub.ready;
@@ -115,17 +132,17 @@ export function Reader({ book }: { book: Book }) {
         walk(nav.toc);
         const cleaned = flat
           .filter((i) => !/^cover$/i.test(i.label.trim()))
-          .map((i) => (/^PPS_|_Ebook/i.test(i.label) ? { ...i, label: "Anfang" } : i));
+          .map((i) => (/^PPS_|_Ebook/i.test(i.label) ? { ...i, label: "__start__" } : i));
         if (!cancelled) setToc(cleaned);
         if (!cancelled) setStatus("bereit");
 
         // Lesestand in Prozent: braucht einmal eine Positions-Liste
         await epub.locations.generate(1600);
         const update = (loc: { start: { cfi: string } }) => {
-          save(`ppsb_pos_${book.id}`, loc.start.cfi);
+          save(posKey, loc.start.cfi);
           const p = Math.round((epub.locations.percentageFromCfi(loc.start.cfi) || 0) * 100);
           setPct(p);
-          save(`ppsb_pct_${book.id}`, p);
+          save(pctKey, p);
         };
         rendition.on("relocated", update);
         const cur = rendition.currentLocation() as unknown as { start?: { cfi: string } };
@@ -148,7 +165,7 @@ export function Reader({ book }: { book: Book }) {
       bookRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.id, book.file]);
+  }, [buchId, sprache]);
 
   const next = useCallback(() => renditionRef.current?.next(), []);
   const prev = useCallback(() => renditionRef.current?.prev(), []);
@@ -181,29 +198,30 @@ export function Reader({ book }: { book: Book }) {
     setPanel("none");
   }
 
-  const t = THEMES[theme];
+  const th = THEMES[theme];
 
   return (
-    <div className="flex h-[100dvh] flex-col" style={{ background: t.bg, color: t.fg }}>
+    <div className="flex h-[100dvh] flex-col" style={{ background: th.bg, color: th.fg }}>
       {/* Obere Leiste */}
       <div className="flex items-center gap-2 px-2 sm:px-4 py-2" style={{ backgroundColor: "#f8e800" }}>
         <Link to="/" className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-stone-900 hover:bg-black/10">
-          <ArrowLeft className="h-4 w-4" /> Regal
+          <ArrowLeft className="h-4 w-4" /> {t("reader.back")}
         </Link>
-        <div className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-stone-900">
-          {book.title}
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-2 text-sm font-semibold text-stone-900">
+          {flagFor(sprache) && <img src={flagFor(sprache)!} alt="" className="h-3.5 w-5 shrink-0 rounded-sm object-cover" />}
+          <span className="truncate">{titel}</span>
         </div>
         <button
           onClick={() => setPanel(panel === "inhalt" ? "none" : "inhalt")}
           className="rounded-md p-2 text-stone-900 hover:bg-black/10"
-          aria-label="Inhalt"
+          aria-label={t("reader.toc")}
         >
           <List className="h-5 w-5" />
         </button>
         <button
           onClick={() => setPanel(panel === "schrift" ? "none" : "schrift")}
           className="rounded-md p-2 text-stone-900 hover:bg-black/10"
-          aria-label="Schrift und Farbe"
+          aria-label={t("reader.font")}
         >
           <Type className="h-5 w-5" />
         </button>
@@ -214,33 +232,37 @@ export function Reader({ book }: { book: Book }) {
         <div ref={viewerRef} className="absolute inset-0 px-2 sm:px-10 py-3" />
 
         {status === "laden" && (
-          <div className="absolute inset-0 grid place-items-center text-sm opacity-70">Buch wird geöffnet …</div>
+          <div className="absolute inset-0 grid place-items-center text-sm opacity-70">{t("reader.loading")}</div>
         )}
         {status === "fehler" && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm">
-            Das Buch konnte nicht geöffnet werden. Bitte später noch einmal versuchen.
+            {t("reader.error")}
           </div>
         )}
 
         {/* Blätter-Knöpfe am Rand (Desktop) */}
-        <button onClick={prev} aria-label="Zurück blättern" className="absolute left-0 top-0 hidden h-full w-10 items-center justify-center opacity-40 hover:opacity-100 sm:flex">
+        <button onClick={prev} aria-label={t("reader.prev")} className="absolute left-0 top-0 hidden h-full w-10 items-center justify-center opacity-40 hover:opacity-100 sm:flex">
           <ChevronLeft className="h-7 w-7" />
         </button>
-        <button onClick={next} aria-label="Weiter blättern" className="absolute right-0 top-0 hidden h-full w-10 items-center justify-center opacity-40 hover:opacity-100 sm:flex">
+        <button onClick={next} aria-label={t("reader.next")} className="absolute right-0 top-0 hidden h-full w-10 items-center justify-center opacity-40 hover:opacity-100 sm:flex">
           <ChevronRight className="h-7 w-7" />
         </button>
 
         {/* Inhaltsverzeichnis */}
         {panel === "inhalt" && (
-          <Panel title="Inhalt" onClose={() => setPanel("none")} bg={t.bg} fg={t.fg}>
+          <Panel title={t("reader.toc")} closeLabel={t("close")} onClose={() => setPanel("none")} bg={th.bg} fg={th.fg}>
             {toc.length === 0 ? (
-              <p className="text-sm opacity-70">Dieses Buch hat kein Inhaltsverzeichnis.</p>
+              <p className="text-sm opacity-70">{t("reader.noToc")}</p>
             ) : (
               <ul className="space-y-1">
                 {toc.map((item) => (
                   <li key={item.id || item.href}>
                     <button onClick={() => goTo(item.href)} className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-black/10">
-                      {/^\d+$/.test(item.label.trim()) ? `Seite ${item.label.trim()}` : item.label.trim()}
+                      {item.label === "__start__"
+                        ? t("reader.start")
+                        : /^\d+$/.test(item.label.trim())
+                          ? `${t("reader.page")} ${item.label.trim()}`
+                          : item.label.trim()}
                     </button>
                   </li>
                 ))}
@@ -251,14 +273,14 @@ export function Reader({ book }: { book: Book }) {
 
         {/* Schrift und Farbe */}
         {panel === "schrift" && (
-          <Panel title="Schrift und Farbe" onClose={() => setPanel("none")} bg={t.bg} fg={t.fg}>
-            <div className="text-xs uppercase tracking-wider opacity-60">Schriftgröße</div>
+          <Panel title={t("reader.font")} closeLabel={t("close")} onClose={() => setPanel("none")} bg={th.bg} fg={th.fg}>
+            <div className="text-xs uppercase tracking-wider opacity-60">{t("reader.size")}</div>
             <div className="mt-2 flex items-center gap-3">
-              <button onClick={() => changeSize(-10)} className="rounded-md border px-3 py-1.5 text-sm" style={{ borderColor: `${t.fg}40` }}>A−</button>
+              <button onClick={() => changeSize(-10)} className="rounded-md border px-3 py-1.5 text-sm" style={{ borderColor: `${th.fg}40` }}>A−</button>
               <span className="w-14 text-center text-sm">{size} %</span>
-              <button onClick={() => changeSize(10)} className="rounded-md border px-3 py-1.5 text-lg" style={{ borderColor: `${t.fg}40` }}>A+</button>
+              <button onClick={() => changeSize(10)} className="rounded-md border px-3 py-1.5 text-lg" style={{ borderColor: `${th.fg}40` }}>A+</button>
             </div>
-            <div className="mt-5 text-xs uppercase tracking-wider opacity-60">Farbe</div>
+            <div className="mt-5 text-xs uppercase tracking-wider opacity-60">{t("reader.color")}</div>
             <div className="mt-2 flex gap-2">
               {(Object.keys(THEMES) as Theme[]).map((k) => (
                 <button
@@ -268,11 +290,11 @@ export function Reader({ book }: { book: Book }) {
                   style={{
                     background: THEMES[k].bg,
                     color: THEMES[k].fg,
-                    borderColor: theme === k ? "#f8e800" : `${t.fg}40`,
+                    borderColor: theme === k ? "#f8e800" : `${th.fg}40`,
                     borderWidth: theme === k ? 2 : 1,
                   }}
                 >
-                  {THEMES[k].label}
+                  {t(THEMES[k].label)}
                 </button>
               ))}
             </div>
@@ -281,15 +303,15 @@ export function Reader({ book }: { book: Book }) {
       </div>
 
       {/* Untere Leiste */}
-      <div className="flex items-center gap-3 px-3 sm:px-6 py-2 text-xs" style={{ borderTop: `1px solid ${t.fg}20` }}>
-        <button onClick={prev} className="rounded-md p-1.5 hover:bg-black/10" aria-label="Zurück blättern">
+      <div className="flex items-center gap-3 px-3 sm:px-6 py-2 text-xs" style={{ borderTop: `1px solid ${th.fg}20` }}>
+        <button onClick={prev} className="rounded-md p-1.5 hover:bg-black/10" aria-label={t("reader.prev")}>
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: `${t.fg}20` }}>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: `${th.fg}20` }}>
           <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: "#f8e800" }} />
         </div>
         <span className="w-10 text-right tabular-nums opacity-70">{pct} %</span>
-        <button onClick={next} className="rounded-md p-1.5 hover:bg-black/10" aria-label="Weiter blättern">
+        <button onClick={next} className="rounded-md p-1.5 hover:bg-black/10" aria-label={t("reader.next")}>
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
@@ -299,12 +321,14 @@ export function Reader({ book }: { book: Book }) {
 
 function Panel({
   title,
+  closeLabel,
   onClose,
   bg,
   fg,
   children,
 }: {
   title: string;
+  closeLabel: string;
   onClose: () => void;
   bg: string;
   fg: string;
@@ -317,7 +341,7 @@ function Panel({
     >
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-semibold">{title}</h2>
-        <button onClick={onClose} className="rounded-md p-1.5 hover:bg-black/10" aria-label="Schließen">
+        <button onClick={onClose} className="rounded-md p-1.5 hover:bg-black/10" aria-label={closeLabel}>
           <X className="h-5 w-5" />
         </button>
       </div>

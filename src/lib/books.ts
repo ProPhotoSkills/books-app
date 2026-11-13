@@ -1,46 +1,45 @@
-// Die Bücher im Regal von PPS Books.
+// PPS Books holt ALLES vom Tor books-gate – in der App selbst liegen keine Bücher.
+// Das Tor liest das Repo books aus (Regel <buch>/<sprache>/<datei>.epub) und liefert:
+//   /katalog                 → Liste aller Bücher mit ihren Sprach-Ausgaben
+//   /cover/<buch>/<sprache>  → Titelbild aus dem EPUB
+//   /buch/<buch>/<sprache>   → die EPUB-Datei
 //
-// books-app_v1 (Prototyp): Die EPUBs kommen aus public/test-books/ – das sind
-// die TEST-Ausgaben aus dem Brain (1_web/16_books/dateien/…), nur zum Ausprobieren.
-// Ab der nächsten Stufe liefert das Tor books-gate die Bücher aus dem privaten
-// Repo books – nur an Konten, die das Buch gekauft haben. Dann verschwindet
-// public/test-books/ wieder aus diesem Repo.
+// Adresse des Tors: Cloudflare-Variable VITE_BOOKS_GATE_URL (Build-Variable),
+// sonst https://books-gate.prophotoskills.workers.dev
 //
-// Titel stehen hier bewusst sauber drin – die Titel in den EPUB-Dateien
-// sind Dateinamen aus InDesign (z. B. „PPS_NextLevel_A5_Ebook_202611-TEST-27“).
+// Nächste Stufe: Anmeldung (Web Login) – dann schickt die App einen Ausweis mit,
+// und das Tor liefert nur gekaufte Bücher.
 
-export type Book = {
-  id: string;
-  title: string;
-  subtitle: string;
+export const GATE_URL: string = (
+  (import.meta.env.VITE_BOOKS_GATE_URL as string | undefined) ?? "https://books-gate.prophotoskills.workers.dev"
+).replace(/\/+$/, "");
+
+export type Ausgabe = {
+  sprache: string;
+  datei: string;
   cover: string;
-  file: string;
+  epub: string;
+  groesse: number | null;
 };
 
-export const BOOKS: Book[] = [
-  {
-    id: "nextlevel",
-    title: "Next Level",
-    subtitle: "Photoguide",
-    cover: "/covers/nextlevel.webp",
-    file: "/test-books/nextlevel.epub",
-  },
-  {
-    id: "onlocation",
-    title: "On Location",
-    subtitle: "Photoguide",
-    cover: "/covers/onlocation.webp",
-    file: "/test-books/onlocation.epub",
-  },
-  {
-    id: "beginner",
-    title: "Beginner",
-    subtitle: "Photoguide",
-    cover: "/covers/beginner.webp",
-    file: "/test-books/beginner.epub",
-  },
-];
+export type Buch = { id: string; titel: string; ausgaben: Ausgabe[] };
 
-export function findBook(id: string): Book | undefined {
-  return BOOKS.find((b) => b.id === id);
+export type Katalog = { stand: string; buecher: Buch[]; warnungen: string[] };
+
+export async function ladeKatalog(): Promise<Katalog> {
+  const res = await fetch(`${GATE_URL}/katalog`);
+  if (!res.ok) throw new Error(`Katalog: HTTP ${res.status}`);
+  return (await res.json()) as Katalog;
+}
+
+export function gateUrl(pfad: string): string {
+  return `${GATE_URL}${pfad}`;
+}
+
+export function ausgabeFuer(buch: Buch, sprache: string): Ausgabe | undefined {
+  return buch.ausgaben.find((a) => a.sprache.slice(0, 2) === sprache.slice(0, 2));
+}
+
+export function lesestandKey(buch: string, sprache: string, art: "pos" | "pct"): string {
+  return `ppsb_${art}_${buch}_${sprache}`;
 }
