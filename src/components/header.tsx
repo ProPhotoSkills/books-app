@@ -16,11 +16,8 @@ export function Header({ right }: { right?: ReactNode }) {
           <img
             src="/assets/photoskills-logo.png"
             alt="ProPhotoSkills"
-            className="h-6 sm:h-7 w-auto max-w-[180px] object-contain"
+            className="h-7 sm:h-8 w-auto max-w-[220px] object-contain"
           />
-          <span className="truncate font-semibold tracking-tight text-sm sm:text-base text-stone-900/90">
-            PPS Books
-          </span>
         </Link>
         <div className="flex items-center gap-2 shrink-0">{right}</div>
       </div>
