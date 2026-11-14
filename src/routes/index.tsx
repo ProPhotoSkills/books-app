@@ -6,7 +6,8 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ausgabeFuer, gateUrl, ladeKatalog, lesestandKey, type Buch, type Katalog } from "@/lib/books";
-import { flagFor, labelFor, useI18n } from "@/lib/i18n";
+import { flagFor, labelFor, LANGS, useI18n } from "@/lib/i18n";
+import { buchText, MODULE, REIHENFOLGE } from "@/lib/buchtexte";
 import { load } from "@/lib/storage";
 
 export const Route = createFileRoute("/")({
@@ -76,9 +77,9 @@ function Shelf() {
             {katalog && katalog.buecher.length === 0 && <Hinweis text={t("shelf.empty")} />}
 
             {katalog && katalog.buecher.length > 0 && (
-              <ul className="mt-10 grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-5 lg:gap-8">
-                {katalog.buecher.map((b) => (
-                  <BuchKarte key={b.id} buch={b} lang={lang} />
+              <ul className="mt-10 flex flex-col gap-5 sm:gap-8">
+                {sortiert(katalog.buecher).map((b) => (
+                  <BuchKachel key={b.id} buch={b} lang={lang} />
                 ))}
               </ul>
             )}
@@ -95,107 +96,127 @@ function Hinweis({ text }: { text: string }) {
   return <p className="mt-10 max-w-2xl rounded-xl border border-stone-200 bg-white/90 p-6 text-stone-700 shadow-lg backdrop-blur-sm">{text}</p>;
 }
 
-// Kachel im Aufbau wie die Produktkacheln im KI-Coach (offers-dialog im Repo app):
-// Cover im eigenen Feld, gelber Titel, gleiche Abstände – aber HELL (Eric 13.11.:
-// „Anmutung muss heller … gelbe Schrift bleibt, Text dunkelgrau, nicht schwarz“).
-function BuchKarte({ buch, lang }: { buch: Buch; lang: string }) {
+// Reihenfolge: Next Level, On Location, darunter Beginner (Eric 14.11.); unbekannte Bücher danach
+function sortiert(buecher: Buch[]): Buch[] {
+  const rang = (id: string) => {
+    const i = REIHENFOLGE.indexOf(id);
+    return i === -1 ? 999 : i;
+  };
+  return [...buecher].sort((a, b) => rang(a.id) - rang(b.id) || a.id.localeCompare(b.id));
+}
+
+// Große Kachel je Buch (Eric 14.11.): links der Text zum Buch (Covertext aus dem PDF),
+// rechts das Cover der gewählten Sprache, daneben die 8 Sprachen zum Umstellen.
+// Das Cover kommt je Sprache aus deren EPUB – sobald die Sprach-EPUBs eigene Cover haben,
+// wechselt es mit.
+function BuchKachel({ buch, lang }: { buch: Buch; lang: string }) {
   const { t } = useI18n();
-  const passend = ausgabeFuer(buch, lang);
-  // Gibt es das Buch nicht in der gewählten Sprache: Cover der ersten Ausgabe, abgedunkelt
-  const zeige = passend ?? buch.ausgaben[0];
+  const start = ausgabeFuer(buch, lang) ?? ausgabeFuer(buch, "de") ?? buch.ausgaben[0];
+  const [sprache, setSprache] = useState(start.sprache);
+  // Wechselt oben die Flagge, folgt die Kachel – sofern es die Sprache gibt
+  useEffect(() => {
+    const a = ausgabeFuer(buch, lang);
+    if (a) setSprache(a.sprache);
+  }, [lang, buch]);
+
+  const aktiv = buch.ausgaben.find((a) => a.sprache === sprache) ?? start;
   const [pct, setPct] = useState(0);
   useEffect(() => {
-    setPct(passend ? load<number>(lesestandKey(buch.id, passend.sprache, "pct"), 0) : 0);
-  }, [buch.id, passend]);
+    setPct(load<number>(lesestandKey(buch.id, aktiv.sprache, "pct"), 0));
+  }, [buch.id, aktiv.sprache]);
 
-  const kachel = "group relative flex h-full flex-col overflow-hidden rounded-xl border border-stone-200 bg-white/90 shadow-lg backdrop-blur-sm transition-colors";
+  const text = buchText(buch.id, aktiv.sprache.slice(0, 2)); // Text folgt der gewählten Sprache der Kachel
+  const module = MODULE[buch.id] ?? [];
 
-  const oben = (
-    <>
-      {/* Schatten unter dem Cover (Eric 13.11.: „damit der nicht so platt aussieht“) – unten etwas mehr Platz dafür */}
-      <div className="flex items-center justify-center bg-stone-100 px-2 pb-4 pt-2 sm:px-3 sm:pb-5 sm:pt-3">
-        <img
-          src={gateUrl(zeige.cover)}
-          alt={buch.titel}
-          className={`h-auto max-h-36 w-full object-contain transition-transform duration-300 sm:max-h-48 lg:max-h-64 ${
-            passend ? "group-hover:scale-[1.03]" : "opacity-40"
-          }`}
-          style={{ filter: `${passend ? "" : "grayscale(1) "}${COVER_SCHATTEN}` }}
-          loading="lazy"
-        />
-      </div>
-    </>
-  );
-
-  const titel = (
-    <div>
-      {/* Variante C (Eric 13.11.): Titel dunkelgrau auf gelbem Schild – gelb auf Weiß ist nicht lesbar */}
-      <h3
-        className="inline-block rounded-md px-2 py-0.5 text-sm font-bold leading-tight text-stone-800 sm:text-lg"
-        style={{ backgroundColor: YELLOW }}
-      >
-        {buch.titel}
-      </h3>
-      <p className="mt-1 text-[10px] font-medium text-stone-500 sm:text-xs">Photoguide</p>
+  const sprachen = (
+    <div className="flex flex-row flex-wrap gap-1.5 md:flex-col md:flex-nowrap">
+      {LANGS.map((l) => {
+        const a = ausgabeFuer(buch, l.code);
+        const gewaehlt = a && a.sprache === aktiv.sprache;
+        return (
+          <button
+            key={l.code}
+            type="button"
+            disabled={!a}
+            onClick={() => a && setSprache(a.sprache)}
+            title={a ? l.label : `${l.label} – ${t("shelf.notAvailable")}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold uppercase transition ${
+              gewaehlt
+                ? "border-stone-800 bg-[#f8e800] text-stone-900"
+                : a
+                  ? "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
+                  : "cursor-not-allowed border-stone-200 bg-stone-50 text-stone-300 opacity-60"
+            }`}
+          >
+            <img src={l.flag} alt="" className={`h-3 w-4 rounded-sm object-cover ${a ? "" : "grayscale"}`} />
+            {l.code}
+          </button>
+        );
+      })}
     </div>
   );
 
-  if (passend) {
-    return (
-      <li>
+  return (
+    <li className="overflow-hidden rounded-xl border border-stone-200 bg-white/90 shadow-lg backdrop-blur-sm">
+      <div className="grid gap-5 p-4 sm:p-6 md:grid-cols-[minmax(0,1fr)_auto_auto] md:gap-8 lg:p-8">
+        {/* Links: Titel, Module, Text, Lesestand */}
+        <div className="flex min-w-0 flex-col gap-3 md:order-1 order-2">
+          <div>
+            {/* Variante C (Eric 13.11.): Titel dunkelgrau auf gelbem Schild */}
+            <h3
+              className="inline-block rounded-md px-2.5 py-1 text-xl font-bold leading-tight text-stone-800 sm:text-2xl"
+              style={{ backgroundColor: YELLOW }}
+            >
+              {buch.titel}
+            </h3>
+            <p className="mt-1.5 text-xs font-medium text-stone-500 sm:text-sm">Photoguide</p>
+            {module.length > 0 && (
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400 sm:text-xs">
+                {module.join(" · ")}
+              </p>
+            )}
+          </div>
+          {text && <p className="text-sm leading-relaxed text-stone-700 sm:text-base">{text}</p>}
+          <div className="mt-auto pt-2">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: YELLOW }} />
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <span className="text-xs text-stone-600 sm:text-sm">
+                {pct > 0 ? t("shelf.read", { n: pct }) : t("shelf.notStarted")}
+              </span>
+              <Link
+                to="/lesen/$buch/$sprache"
+                params={{ buch: buch.id, sprache: aktiv.sprache }}
+                className="inline-flex items-center gap-1.5 rounded-md bg-stone-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-stone-700 sm:text-sm"
+              >
+                <BookOpen className="h-4 w-4" /> {t("shelf.open")}
+                <img src={flagFor(aktiv.sprache) ?? ""} alt="" className="ml-0.5 h-3 w-4 rounded-sm object-cover" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Mitte: Cover der gewählten Sprache */}
         <Link
           to="/lesen/$buch/$sprache"
-          params={{ buch: buch.id, sprache: passend.sprache }}
-          className={`${kachel} hover:border-[#f8e800]`}
+          params={{ buch: buch.id, sprache: aktiv.sprache }}
+          className="group order-1 flex items-start justify-center rounded-lg bg-stone-100 px-4 pb-5 pt-4 md:order-2"
         >
-          {oben}
-          <div className="flex flex-1 flex-col gap-1.5 p-2.5 sm:gap-2.5 sm:p-4 lg:p-5">
-            {titel}
-            <div className="mt-auto pt-1">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: YELLOW }} />
-              </div>
-              <div className="mt-1.5 flex flex-col items-start gap-1.5 lg:flex-row lg:items-center lg:justify-between lg:gap-2">
-                <span className="text-[11px] text-stone-600 sm:text-sm">
-                  {pct > 0 ? t("shelf.read", { n: pct }) : t("shelf.notStarted")}
-                </span>
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-stone-700 sm:text-xs">
-                  {t("shelf.open")} <BookOpen className="h-3.5 w-3.5" />
-                </span>
-              </div>
-            </div>
-          </div>
+          <img
+            key={aktiv.cover}
+            src={gateUrl(aktiv.cover)}
+            alt={`${buch.titel} – ${labelFor(aktiv.sprache)}`}
+            className="h-auto max-h-72 w-auto max-w-[200px] object-contain transition-transform duration-300 group-hover:scale-[1.03] sm:max-h-80 sm:max-w-[230px]"
+            style={{ filter: COVER_SCHATTEN }}
+            loading="lazy"
+          />
         </Link>
-      </li>
-    );
-  }
 
-  return (
-    <li>
-      <div className={kachel}>
-        {oben}
-        <div className="flex flex-1 flex-col gap-1.5 p-2.5 sm:gap-2.5 sm:p-4 lg:p-5">
-          {titel}
-          <div className="mt-auto pt-1">
-            <p className="text-[11px] text-stone-600 sm:text-sm">{t("shelf.otherLang")}</p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {buch.ausgaben.map((a) => {
-                const flag = flagFor(a.sprache);
-                return (
-                  <Link
-                    key={a.sprache}
-                    to="/lesen/$buch/$sprache"
-                    params={{ buch: buch.id, sprache: a.sprache }}
-                    title={labelFor(a.sprache)}
-                    className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-1.5 py-0.5 text-[9px] font-semibold uppercase text-stone-700 hover:border-[#f8e800] sm:px-2 sm:text-[10px]"
-                  >
-                    {flag && <img src={flag} alt="" className="h-3 w-4 rounded-sm object-cover" />}
-                    {a.sprache}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
+        {/* Rechts: Sprachen */}
+        <div className="order-3 md:pt-1">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500 sm:text-xs">{t("shelf.languages")}</p>
+          {sprachen}
         </div>
       </div>
     </li>
