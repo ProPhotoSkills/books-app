@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, List, Type, X } from "lucide-react";
 import type { Book as EpubBook, Rendition, NavItem } from "epubjs";
 
-import { gateUrl, ladeKatalog, lesestandKey } from "@/lib/books";
+import { ladeKatalog, lesestandKey } from "@/lib/books";
+import { gateFetch } from "@/lib/auth";
 import { flagFor, useI18n } from "@/lib/i18n";
 import { load, save } from "@/lib/storage";
 
@@ -46,7 +47,7 @@ export function Reader({ buchId, sprache }: { buchId: string; sprache: string })
   const renditionRef = useRef<Rendition | null>(null);
   const bookRef = useRef<EpubBook | null>(null);
 
-  const [status, setStatus] = useState<"laden" | "bereit" | "fehler">("laden");
+  const [status, setStatus] = useState<"laden" | "bereit" | "fehler" | "gesperrt">("laden");
   const [toc, setToc] = useState<NavItem[]>([]);
   const [pct, setPct] = useState<number>(0);
   const [panel, setPanel] = useState<"none" | "inhalt" | "schrift">("none");
@@ -67,8 +68,14 @@ export function Reader({ buchId, sprache }: { buchId: string; sprache: string })
     (async () => {
       try {
         const { default: ePub } = await import("epubjs");
-        // Buch beim Tor holen. Nächste Stufe: mit Ausweis (Anmeldung), nur gekaufte Bücher.
-        const res = await fetch(gateUrl(`/buch/${encodeURIComponent(buchId)}/${encodeURIComponent(sprache)}`));
+        // Buch beim Tor holen – v12 mit Ausweis (Anmeldung); nur freie oder gekaufte Bücher
+        const res = await gateFetch(`/buch/${encodeURIComponent(buchId)}/${encodeURIComponent(sprache)}`);
+        if (res.status === 401) {
+          // nicht angemeldet → zur Anmeldung, danach zurück zu diesem Buch
+          window.location.assign(`/anmelden?weiter=${encodeURIComponent(`/lesen/${buchId}/${sprache}`)}`);
+          return;
+        }
+        if (res.status === 403) throw new Error("gesperrt");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.arrayBuffer();
         if (cancelled || !viewerRef.current) return;
@@ -153,8 +160,9 @@ export function Reader({ buchId, sprache }: { buchId: string; sprache: string })
           epub.destroy();
         };
       } catch (err) {
-        console.error(err);
-        if (!cancelled) setStatus("fehler");
+        const gesperrt = (err as Error).message === "gesperrt";
+        if (!gesperrt) console.error(err);
+        if (!cancelled) setStatus(gesperrt ? "gesperrt" : "fehler");
       }
     })();
 
@@ -234,9 +242,9 @@ export function Reader({ buchId, sprache }: { buchId: string; sprache: string })
         {status === "laden" && (
           <div className="absolute inset-0 grid place-items-center text-sm opacity-70">{t("reader.loading")}</div>
         )}
-        {status === "fehler" && (
+        {(status === "fehler" || status === "gesperrt") && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm">
-            {t("reader.error")}
+            {status === "gesperrt" ? t("reader.locked") : t("reader.error")}
           </div>
         )}
 

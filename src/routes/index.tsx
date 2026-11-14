@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Lock } from "lucide-react";
 
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { KontoKnopf } from "@/components/konto-knopf";
+import { useAuth } from "@/lib/auth";
 import { ausgabeFuer, gateUrl, ladeKatalog, lesestandKey, type Buch, type Katalog } from "@/lib/books";
 import { flagFor, labelFor, LANGS, useI18n } from "@/lib/i18n";
 import { buchText, MODULE, REIHENFOLGE } from "@/lib/buchtexte";
@@ -42,6 +44,7 @@ function Shelf() {
             <span className="hidden sm:inline rounded-full bg-black/80 px-3 py-1 text-xs font-medium text-white">
               {t("badge.test")}
             </span>
+            <KontoKnopf />
             <LanguageSwitcher />
           </>
         }
@@ -125,7 +128,14 @@ function BuchKachel({ buch, lang }: { buch: Buch; lang: string }) {
     setPct(load<number>(lesestandKey(buch.id, aktiv.sprache, "pct"), 0));
   }, [buch.id, aktiv.sprache]);
 
-  const text = buchText(buch.id, aktiv.sprache.slice(0, 2)); // Text folgt der gewählten Sprache der Kachel
+  const text = buchText(buch.id, aktiv.sprache.slice(0, 2));
+  // v12 Freischaltung: frei (Beginner) oder gekauft → Lesen; sonst Schloss
+  const { darfLesen, session } = useAuth();
+  const darf = darfLesen(buch.id);
+  // v13: Beginner = kostenlos mit Konto (Gate: KONTO_BUECHER)
+  const frei = buch.id === "beginner";
+  const kontoWeg = !session && frei; // abgemeldet + Beginner → kostenlos registrieren
+  const ziel = `/lesen/${buch.id}/${aktiv.sprache}`; // Text folgt der gewählten Sprache der Kachel
   const module = MODULE[buch.id] ?? [];
 
   const sprachen = (
@@ -169,7 +179,14 @@ function BuchKachel({ buch, lang }: { buch: Buch; lang: string }) {
             >
               {buch.titel}
             </h3>
-            <p className="mt-1.5 text-xs font-medium text-stone-500 sm:text-sm">Photoguide</p>
+            <p className="mt-1.5 text-xs font-medium text-stone-500 sm:text-sm">
+              Photoguide
+              {frei && (
+                <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800 sm:text-xs">
+                  {t("shelf.free")}
+                </span>
+              )}
+            </p>
             {module.length > 0 && (
               <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400 sm:text-xs">
                 {module.join(" · ")}
@@ -185,24 +202,53 @@ function BuchKachel({ buch, lang }: { buch: Buch; lang: string }) {
               <span className="text-xs text-stone-600 sm:text-sm">
                 {pct > 0 ? t("shelf.read", { n: pct }) : t("shelf.notStarted")}
               </span>
-              <Link
-                to="/lesen/$buch/$sprache"
-                params={{ buch: buch.id, sprache: aktiv.sprache }}
-                className="inline-flex items-center gap-1.5 rounded-md bg-stone-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-stone-700 sm:text-sm"
-              >
-                <BookOpen className="h-4 w-4" /> {t("shelf.open")}
-                <img src={flagFor(aktiv.sprache) ?? ""} alt="" className="ml-0.5 h-3 w-4 rounded-sm object-cover" />
-              </Link>
+              {darf ? (
+                <Link
+                  to="/lesen/$buch/$sprache"
+                  params={{ buch: buch.id, sprache: aktiv.sprache }}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-stone-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-stone-700 sm:text-sm"
+                >
+                  <BookOpen className="h-4 w-4" /> {t("shelf.open")}
+                  <img src={flagFor(aktiv.sprache) ?? ""} alt="" className="ml-0.5 h-3 w-4 rounded-sm object-cover" />
+                </Link>
+              ) : kontoWeg ? (
+                <Link
+                  to="/registrieren"
+                  search={{ weiter: ziel }}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-stone-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-stone-700 sm:text-sm"
+                >
+                  <BookOpen className="h-4 w-4" /> {t("shelf.registerToRead")}
+                </Link>
+              ) : !session ? (
+                <Link
+                  to="/anmelden"
+                  search={{ weiter: ziel }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-800 bg-white px-3 py-1.5 text-xs font-semibold text-stone-800 hover:bg-stone-100 sm:text-sm"
+                >
+                  <Lock className="h-4 w-4" /> {t("shelf.loginToRead")}
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-stone-200 px-3 py-1.5 text-xs font-semibold text-stone-500 sm:text-sm">
+                  <Lock className="h-4 w-4" /> {t("shelf.locked")}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         {/* Mitte: Cover der gewählten Sprache */}
         <Link
-          to="/lesen/$buch/$sprache"
+          to={darf ? "/lesen/$buch/$sprache" : kontoWeg ? "/registrieren" : "/anmelden"}
           params={{ buch: buch.id, sprache: aktiv.sprache }}
-          className="group order-1 flex items-start justify-center rounded-lg bg-stone-100 px-4 pb-5 pt-4 md:order-2"
+          search={darf ? undefined : { weiter: ziel }}
+          disabled={!darf && !!session}
+          className="group relative order-1 flex items-start justify-center rounded-lg bg-stone-100 px-4 pb-5 pt-4 md:order-2"
         >
+          {!darf && (
+            <span className="absolute right-2 top-2 z-10 rounded-full bg-stone-800/85 p-1.5 text-white" title={session ? t("shelf.locked") : t("shelf.loginToRead")}>
+              <Lock className="h-3.5 w-3.5" />
+            </span>
+          )}
           <img
             key={aktiv.cover}
             src={gateUrl(aktiv.cover)}
