@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { FELD, KNOPF, KontoSeite } from "@/components/konto-seite";
 import { useAuth } from "@/lib/auth";
+import { freiesZiel, istKaufbuch } from "@/lib/buchziel";
 import { useI18n } from "@/lib/i18n";
 
 // Kostenloses Konto anlegen (v13, Eric 14.11.: Variante C) – damit ist Beginner lesbar.
@@ -17,7 +18,9 @@ export const Route = createFileRoute("/registrieren")({
 function Registrieren() {
   const { t, lang } = useI18n();
   const { registrieren } = useAuth();
-  const { weiter } = Route.useSearch();
+  const { weiter: roh } = Route.useSearch();
+  // v16: kommt man von einem Kaufbuch, führt das kostenlose Konto zu Beginner – nicht zurück vor das gesperrte Buch
+  const weiter = istKaufbuch(roh) ? freiesZiel(roh, lang) : roh;
   const [email, setEmail] = useState("");
   const [passwort, setPasswort] = useState("");
   const [newsletter, setNewsletter] = useState(false);

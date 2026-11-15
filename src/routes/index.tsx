@@ -41,9 +41,6 @@ function Shelf() {
       <Header
         right={
           <>
-            <span className="hidden sm:inline rounded-full bg-black/80 px-3 py-1 text-xs font-medium text-white">
-              {t("badge.test")}
-            </span>
             <KontoKnopf />
             <LanguageSwitcher />
           </>

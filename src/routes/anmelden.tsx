@@ -3,10 +3,12 @@ import { useState } from "react";
 
 import { FELD, KNOPF, KontoSeite } from "@/components/konto-seite";
 import { useAuth } from "@/lib/auth";
+import { buchName, freiesZiel, istKaufbuch, zielInfo } from "@/lib/buchziel";
 import { useI18n } from "@/lib/i18n";
 
 // Anmelden mit dem Konto aus web (Supabase „Web Login“) – v12
 // ?weiter=/lesen/… → nach der Anmeldung direkt dorthin
+// v16: kommt man von einem Kaufbuch, erklärt die Seite das Buch und schickt „kostenlos registrieren“ zu Beginner
 export const Route = createFileRoute("/anmelden")({
   head: () => ({ meta: [{ title: "PPS Books" }] }),
   validateSearch: (s: Record<string, unknown>) => ({ weiter: typeof s.weiter === "string" && s.weiter.startsWith("/") ? s.weiter : undefined }),
@@ -14,10 +16,12 @@ export const Route = createFileRoute("/anmelden")({
 });
 
 function Anmelden() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { anmelden, passwortVergessen } = useAuth();
   const { weiter } = Route.useSearch();
   const navigate = useNavigate();
+  const kaufbuch = istKaufbuch(weiter);
+  const name = kaufbuch ? buchName(zielInfo(weiter)!.buch) : "";
   const [email, setEmail] = useState("");
   const [passwort, setPasswort] = useState("");
   const [vergessen, setVergessen] = useState(false);
@@ -49,7 +53,7 @@ function Anmelden() {
 
   return (
     <KontoSeite titel={vergessen ? t("auth.forgot") : t("auth.title")}>
-      <p className="text-sm text-stone-600">{t("auth.hint")}</p>
+      <p className="text-sm text-stone-600">{kaufbuch ? t("auth.hintBook", { buch: name }) : t("auth.hint")}</p>
       <form onSubmit={absenden} className="mt-5 space-y-4">
         <label className="block text-sm font-medium text-stone-700">
           {t("auth.email")}
@@ -70,13 +74,25 @@ function Anmelden() {
           {laeuft ? t("auth.busy") : vergessen ? t("auth.forgotSend") : t("auth.submit")}
         </button>
       </form>
-      {!vergessen && (
+      {!vergessen && !kaufbuch && (
         <p className="mt-5 rounded-md bg-stone-100 px-3 py-2 text-sm text-stone-700">
           {t("auth.noAccount")}{" "}
           <Link to="/registrieren" search={{ weiter }} className="font-semibold text-stone-900 underline underline-offset-2">
             {t("auth.register")}
           </Link>
         </p>
+      )}
+      {!vergessen && kaufbuch && (
+        <div className="mt-5 rounded-md bg-stone-100 px-3 py-2 text-sm text-stone-700">
+          <p>{t("auth.freeOnly", { buch: name })}</p>
+          <Link
+            to="/registrieren"
+            search={{ weiter: freiesZiel(weiter, lang) }}
+            className="mt-1 inline-block font-semibold text-stone-900 underline underline-offset-2"
+          >
+            {t("auth.registerBeginner")}
+          </Link>
+        </div>
       )}
       <div className="mt-5 flex items-center justify-between gap-3 text-sm">
         <button type="button" onClick={() => { setVergessen(!vergessen); setMeldung(null); }} className="text-stone-600 underline-offset-2 hover:underline">
