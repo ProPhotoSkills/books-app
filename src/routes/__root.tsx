@@ -28,7 +28,9 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      // v15: ohne viewport-fit=cover (wie KI-Coach) – sonst legt Android/Capacitor 8 die Seite unter die
+      // Statusleiste und Anmelden/Sprachen sind auf dem Handy nicht antippbar (Eric 15.11.)
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "PPS Books" },
       { name: "description", content: "PPS Books – deine ProPhotoSkills-Bücher lesen." },
       { name: "author", content: "ProPhotoSkills" },
