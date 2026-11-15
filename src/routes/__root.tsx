@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { I18nProvider } from "../lib/i18n";
 import { AuthProvider } from "../lib/auth";
+import { CookieBanner } from "../components/cookie-banner";
 
 function NotFoundComponent() {
   return (
@@ -50,6 +51,7 @@ export const Route = createRootRoute({
     <I18nProvider>
       <AuthProvider>
         <Outlet />
+        <CookieBanner />
       </AuthProvider>
     </I18nProvider>
   ),
