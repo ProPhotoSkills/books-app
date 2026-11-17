@@ -123,7 +123,17 @@ export function Reader({ buchId, sprache }: { buchId: string; sprache: string })
         });
 
         const startAt = load<string | null>(posKey, null);
-        await rendition.display(startAt ?? undefined);
+        // v19: Wurde das Buch auf GitHub ausgetauscht, gibt es die gemerkte Stelle evtl. nicht mehr
+        // (Eric 17.11.: „Dieses Buch lässt sich nicht öffnen“ in Chrome, Firefox geht) –
+        // dann Stelle vergessen und das Buch vorne öffnen statt abzubrechen.
+        try {
+          await rendition.display(startAt ?? undefined);
+        } catch (err) {
+          if (!startAt) throw err;
+          save(posKey, null);
+          save(pctKey, 0);
+          await rendition.display();
+        }
 
         await epub.ready;
         const nav = await epub.loaded.navigation;
