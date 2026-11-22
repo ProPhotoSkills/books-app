@@ -35,8 +35,11 @@ export const Route = createRootRoute({
       { title: "PPS Books" },
       { name: "description", content: "PPS Books – deine ProPhotoSkills-Bücher lesen." },
       { name: "author", content: "ProPhotoSkills" },
-      // Prototyp: noch nicht in Suchmaschinen
-      { name: "robots", content: "noindex, nofollow" },
+      // v20: Bing-Verifizierung (Eric 22.11.: „Der Bing-Tag fehlt in der Books-App“) – gleicher Code
+      // wie KI-Coach und public/BingSiteAuth.xml (Brain 0_grundlagen/02_infrastruktur/bing-webmaster/).
+      { name: "msvalidate.01", content: "9B1007E353A46F4EAEBA52F1CAD547DC" },
+      // v21: für Suchmaschinen freigegeben (Eric 22.11.: „ja klar – beide Apps freigeben“), wie KI-Coach
+      { name: "robots", content: "follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large" },
       { name: "theme-color", content: "#f8e800" },
     ],
     links: [

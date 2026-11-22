@@ -1,3 +1,2 @@
-# PPS Books – Prototyp, noch nicht in Suchmaschinen
 User-agent: *
-Disallow: /
+Allow: /
