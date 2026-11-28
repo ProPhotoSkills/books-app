@@ -9,6 +9,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 
+import { besuchMelden } from "@/lib/besuch";
+
 import { gateUrl } from "@/lib/books";
 
 // Öffentliche Werte des Projekts „Web Login“ (stehen genauso im Repo web, src/integrations/supabase/client.ts).
@@ -85,6 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = sb.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // v24: Herkunft erfassen (1× am Tag je Konto, Umbau Konto & Zugang Schritt 5)
+  const kontoId = session?.user?.id ?? null;
+  useEffect(() => {
+    void besuchMelden(supabase(), kontoId);
+  }, [kontoId]);
 
   const token = session?.access_token ?? null;
   useEffect(() => {

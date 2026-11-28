@@ -1,0 +1,16 @@
+# PPS Books
+
+> PPS Books ist die Lese-App von ProPhotoSkills für die Photoguides Next Level, On Location und Beginner. Gekauft wird auf prophotoskills.com; in der App liest man mit seinem Konto. Der Photoguide Beginner ist mit Konto kostenlos.
+
+Die Wissensseiten unten sind öffentlich und zeigen je Buch: worum es geht, das Inhaltsverzeichnis, eine Leseprobe aus dem Buch, freie Kapitel auf prophotoskills.com und Antworten auf häufige Fragen. Sprachen: Deutsch unter /wissen/<buch>, weitere Sprachen unter /wissen/<buch>/<sprache> (en, fr, it, es, pt, el, ja) – z. B. https://books.prophotoskills.workers.dev/wissen/nextlevel/en.
+
+## Photoguides
+
+- [Photoguide Next Level](https://books.prophotoskills.workers.dev/wissen/nextlevel): Wissen, Haltung und Struktur für Fotograf:innen auf dem Weg zur professionellen Werbefotografie – Vorbereitung, Team, Führung am Set, Preise und Nutzungsrechte (73 Kapitel).
+- [Photoguide On Location](https://books.prophotoskills.workers.dev/wissen/onlocation): Shootings vor Ort – Travel, Location, Insurance und Equipment (62 Kapitel).
+- [Photoguide Beginner](https://books.prophotoskills.workers.dev/wissen/beginner): Einstieg in die Fotografie – Belichtung, Komposition, Porträt, Landschaft, Nacht, Licht, Nachbearbeitung, Portfolio (10 Kapitel). Kostenlos mit Konto.
+
+## Mehr
+
+- [ProPhotoSkills](https://prophotoskills.com/): Wissensplattform für professionelle Fotografie, Autor Eric P.
+- [FAQ](https://prophotoskills.com/faq/): Antworten zur professionellen Fotografie

@@ -13,7 +13,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnmeldenRouteImport } from './routes/anmelden'
 import { Route as PasswortRouteImport } from './routes/passwort'
 import { Route as RegistrierenRouteImport } from './routes/registrieren'
+import { Route as WissenIndexRouteImport } from './routes/wissen.index'
+import { Route as WissenBuchRouteImport } from './routes/wissen.$buch'
 import { Route as LesenBuchSpracheRouteImport } from './routes/lesen.$buch.$sprache'
+import { Route as WissenBuchSpracheRouteImport } from './routes/wissen.$buch_.$sprache'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -35,9 +38,24 @@ const RegistrierenRoute = RegistrierenRouteImport.update({
   path: '/registrieren',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WissenIndexRoute = WissenIndexRouteImport.update({
+  id: '/wissen/',
+  path: '/wissen/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WissenBuchRoute = WissenBuchRouteImport.update({
+  id: '/wissen/$buch',
+  path: '/wissen/$buch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LesenBuchSpracheRoute = LesenBuchSpracheRouteImport.update({
   id: '/lesen/$buch/$sprache',
   path: '/lesen/$buch/$sprache',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WissenBuchSpracheRoute = WissenBuchSpracheRouteImport.update({
+  id: '/wissen/$buch_/$sprache',
+  path: '/wissen/$buch/$sprache',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -46,14 +64,20 @@ export interface FileRoutesByFullPath {
   '/anmelden': typeof AnmeldenRoute
   '/passwort': typeof PasswortRoute
   '/registrieren': typeof RegistrierenRoute
+  '/wissen/$buch': typeof WissenBuchRoute
+  '/wissen/': typeof WissenIndexRoute
   '/lesen/$buch/$sprache': typeof LesenBuchSpracheRoute
+  '/wissen/$buch/$sprache': typeof WissenBuchSpracheRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/anmelden': typeof AnmeldenRoute
   '/passwort': typeof PasswortRoute
   '/registrieren': typeof RegistrierenRoute
+  '/wissen/$buch': typeof WissenBuchRoute
+  '/wissen': typeof WissenIndexRoute
   '/lesen/$buch/$sprache': typeof LesenBuchSpracheRoute
+  '/wissen/$buch/$sprache': typeof WissenBuchSpracheRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -61,22 +85,42 @@ export interface FileRoutesById {
   '/anmelden': typeof AnmeldenRoute
   '/passwort': typeof PasswortRoute
   '/registrieren': typeof RegistrierenRoute
+  '/wissen/$buch': typeof WissenBuchRoute
+  '/wissen/': typeof WissenIndexRoute
   '/lesen/$buch/$sprache': typeof LesenBuchSpracheRoute
+  '/wissen/$buch_/$sprache': typeof WissenBuchSpracheRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/anmelden' | '/passwort' | '/registrieren' | '/lesen/$buch/$sprache'
+    | '/'
+    | '/anmelden'
+    | '/passwort'
+    | '/registrieren'
+    | '/wissen/$buch'
+    | '/wissen/'
+    | '/lesen/$buch/$sprache'
+    | '/wissen/$buch/$sprache'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/anmelden' | '/passwort' | '/registrieren' | '/lesen/$buch/$sprache'
+    | '/'
+    | '/anmelden'
+    | '/passwort'
+    | '/registrieren'
+    | '/wissen/$buch'
+    | '/wissen'
+    | '/lesen/$buch/$sprache'
+    | '/wissen/$buch/$sprache'
   id:
     | '__root__'
     | '/'
     | '/anmelden'
     | '/passwort'
     | '/registrieren'
+    | '/wissen/$buch'
+    | '/wissen/'
     | '/lesen/$buch/$sprache'
+    | '/wissen/$buch_/$sprache'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -84,7 +128,10 @@ export interface RootRouteChildren {
   AnmeldenRoute: typeof AnmeldenRoute
   PasswortRoute: typeof PasswortRoute
   RegistrierenRoute: typeof RegistrierenRoute
+  WissenBuchRoute: typeof WissenBuchRoute
+  WissenIndexRoute: typeof WissenIndexRoute
   LesenBuchSpracheRoute: typeof LesenBuchSpracheRoute
+  WissenBuchSpracheRoute: typeof WissenBuchSpracheRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -117,11 +164,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegistrierenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/wissen/': {
+      id: '/wissen/'
+      path: '/wissen'
+      fullPath: '/wissen/'
+      preLoaderRoute: typeof WissenIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wissen/$buch': {
+      id: '/wissen/$buch'
+      path: '/wissen/$buch'
+      fullPath: '/wissen/$buch'
+      preLoaderRoute: typeof WissenBuchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lesen/$buch/$sprache': {
       id: '/lesen/$buch/$sprache'
       path: '/lesen/$buch/$sprache'
       fullPath: '/lesen/$buch/$sprache'
       preLoaderRoute: typeof LesenBuchSpracheRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wissen/$buch_/$sprache': {
+      id: '/wissen/$buch_/$sprache'
+      path: '/wissen/$buch/$sprache'
+      fullPath: '/wissen/$buch/$sprache'
+      preLoaderRoute: typeof WissenBuchSpracheRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -132,7 +200,10 @@ const rootRouteChildren: RootRouteChildren = {
   AnmeldenRoute: AnmeldenRoute,
   PasswortRoute: PasswortRoute,
   RegistrierenRoute: RegistrierenRoute,
+  WissenBuchRoute: WissenBuchRoute,
+  WissenIndexRoute: WissenIndexRoute,
   LesenBuchSpracheRoute: LesenBuchSpracheRoute,
+  WissenBuchSpracheRoute: WissenBuchSpracheRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -11,6 +11,7 @@ import { ausgabeFuer, gateUrl, ladeKatalog, lesestandKey, type Buch, type Katalo
 import { flagFor, labelFor, LANGS, useI18n } from "@/lib/i18n";
 import { buchText, MODULE, REIHENFOLGE } from "@/lib/buchtexte";
 import { load } from "@/lib/storage";
+import { WISSEN, istSprache, type Sprache } from "@/lib/wissen";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "PPS Books" }] }),
@@ -71,6 +72,13 @@ function Shelf() {
               <span style={{ color: YELLOW }}>Books</span>
             </h1>
             <p className="mt-4 max-w-2xl text-lg font-medium text-stone-900 drop-shadow-sm">{t("shelf.sub")}</p>
+            {/* v22: fester Link zu den Wissensseiten – steht schon im Server-HTML (das Regal lädt erst im Browser) */}
+            <Link
+              to="/wissen"
+              className="mt-3 inline-block rounded-md bg-white/85 px-3 py-1.5 text-sm font-semibold text-stone-800 shadow-sm hover:bg-white"
+            >
+              Wissen zu den Photoguides →
+            </Link>
 
             {fehler && <Hinweis text={t("shelf.error")} />}
             {!fehler && !katalog && <Hinweis text={t("shelf.loading")} />}
@@ -134,6 +142,8 @@ function BuchKachel({ buch, lang }: { buch: Buch; lang: string }) {
   const kontoWeg = !session && frei; // abgemeldet + Beginner → kostenlos registrieren
   const ziel = `/lesen/${buch.id}/${aktiv.sprache}`; // Text folgt der gewählten Sprache der Kachel
   const module = MODULE[buch.id] ?? [];
+  const k2 = aktiv.sprache.slice(0, 2);
+  const wissenSprache: Sprache = istSprache(k2) ? k2 : "de";
 
   const sprachen = (
     <div className="flex flex-row flex-wrap gap-1.5 md:flex-col md:flex-nowrap">
@@ -191,6 +201,26 @@ function BuchKachel({ buch, lang }: { buch: Buch; lang: string }) {
             )}
           </div>
           {text && <p className="text-sm leading-relaxed text-stone-700 sm:text-base">{text}</p>}
+          {/* v22: Link zur öffentlichen Wissensseite (Inhalt, Leseprobe, Fragen) */}
+          {/* v23: führt zur Wissensseite in der Sprache, die in der Kachel gewählt ist */}
+          {WISSEN.de[buch.id] &&
+            (wissenSprache === "de" ? (
+              <Link
+                to="/wissen/$buch"
+                params={{ buch: buch.id }}
+                className="self-start text-xs font-semibold text-stone-700 underline decoration-[#f8e800] decoration-2 underline-offset-4 hover:text-stone-900 sm:text-sm"
+              >
+                {t("shelf.more")} →
+              </Link>
+            ) : (
+              <Link
+                to="/wissen/$buch/$sprache"
+                params={{ buch: buch.id, sprache: wissenSprache }}
+                className="self-start text-xs font-semibold text-stone-700 underline decoration-[#f8e800] decoration-2 underline-offset-4 hover:text-stone-900 sm:text-sm"
+              >
+                {t("shelf.more")} →
+              </Link>
+            ))}
           <div className="mt-auto pt-2">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
               <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: YELLOW }} />

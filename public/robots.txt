@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://books.prophotoskills.workers.dev/sitemap.xml
